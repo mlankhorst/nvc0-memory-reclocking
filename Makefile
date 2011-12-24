@@ -15,5 +15,12 @@ out.asm: values
 	fucdis -n -w -V nva3 values > out.asm
 
 clean:
-	rm -f gen in.asm values out.asm
+	rm -f gen in.asm values out.asm core
+
+dead: values
+	sync
+	./reclock < values
+	sync
+	./peek > core
+	sync
 

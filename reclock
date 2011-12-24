@@ -91,12 +91,7 @@ $e nvapoke 0x10fe20 0x20000000
 
 $e nvapeek 0x132020
 
-echo Kill now or face the consequences..
-sleep 3
-
-$e upload < braaksel
-
-$e peek | tee dump
+$e upload
 
 $e nvapoke 0x001548 0x102
 

@@ -1,11 +1,12 @@
 #!/bin/bash
 
+echo Overwriting PDAEMON with insane buggy script, you are warned
+
 old=0x$(nvapeek 200 | sed -e s@.*\ @@)
 
 nvapoke 200 $(printf %x $(($old & ~(1<<13))))
 nvapoke 200 $old
 
-sleep .1
 nvapoke 0x10a180 0x01000000
 
 n=0
@@ -23,9 +24,10 @@ for i in `seq 0 255`; do nvapoke 0x10a1c4 0; done
 
 nvapoke 0x10a10c 0
 nvapoke 0x10a104 0
-nvapoke 0x10a100 2
 
-sleep 2
+echo Too late, uploading now
+
+nvapoke 0x10a100 2
 
 addr=55e0
 len=40
