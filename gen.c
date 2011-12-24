@@ -311,12 +311,15 @@ static char pre[] =
 "   add b32 $r3 $r3 4\n"
 "   bra #main\n"
 "\n"
+
+#if 0
 "mmsync:\n"
 MMSYNC("")
 "   ret\n\n"
 
 #undef MMSYNC
 #define MMSYNC(x) "   call #mmsync\n"
+#endif
 
 // Cannot use registers 10..13 in mmsync because of them being function arguments
 // The pushes are mostly for debugging, putting the most recent mmrd/wr on the stack
