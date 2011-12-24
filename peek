@@ -1,0 +1,10 @@
+
+addr=55c0
+len=740
+
+nvapoke 0x10a1c0 0x0200${addr}
+
+for n in `seq 0 $((0x${len}/4-1))`; do
+printf "%x: %s\n" $((0x${addr} + $n * 4)) $(nvapeek 0x10a1c4 | sed -e s@.*\ @@)
+done
+

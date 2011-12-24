@@ -1,0 +1,7 @@
+gen
+in.asm
+out.asm
+values
+*~
+*.rej
+*.orig

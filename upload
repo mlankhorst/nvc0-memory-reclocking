@@ -1,0 +1,38 @@
+#!/bin/bash
+
+old=0x$(nvapeek 200 | sed -e s@.*\ @@)
+
+nvapoke 200 $(printf %x $(($old & ~(1<<13))))
+nvapoke 200 $old
+
+sleep .1
+nvapoke 0x10a180 0x01000000
+
+n=0
+while read line; do
+	if [ $(($n % 64)) -eq 0 ]; then
+		nvapoke 0x10a188 $(($n >> 6))
+	fi
+
+	n=$((${n}+1));
+	nvapoke 0x10a184 $line;
+done
+
+nvapoke 0x10a1c0 0x01005500
+for i in `seq 0 255`; do nvapoke 0x10a1c4 0; done
+
+nvapoke 0x10a10c 0
+nvapoke 0x10a104 0
+nvapoke 0x10a100 2
+
+sleep 2
+
+addr=55e0
+len=40
+
+nvapoke 0x10a1c0 0x0200${addr}
+
+for n in `seq 0 $((0x${len}/4-1))`; do
+printf "%x: %s\n" $((0x${addr} + $n * 4)) $(nvapeek 0x10a1c4 | sed -e s@.*\ @@)
+done
+
