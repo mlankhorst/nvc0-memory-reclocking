@@ -5,6 +5,11 @@
 #define DISABLE_LOCK 0
 #define DEBUG_C 0
 
+// Calling convention
+// r9..r15 always trash
+// r4..r8 untouched by mm* functions
+// r0...r3 used by main
+
 static unsigned data[] = {
 0xd0021,
 0x132100,
@@ -274,6 +279,7 @@ static char *method = "mmwrs";
 
 static unsigned unk3ec[3];
 
+// Cannot use registers 10..13 in mmsync because of them being function arguments
 #define MMSYNC(x) \
 "   mov $r9 0\n" \
 "   mmloop_" x ":\n" \
@@ -284,7 +290,7 @@ static unsigned unk3ec[3];
 "      iord $r15 I[$r15]\n" \
 "      add b32 $r9 $r9 1\n" \
 "      extr $r15 $r15 12:14\n" \
-"      bra nz #mmloop_" x "\n" \
+"      bra nz #mmloop_" x "\n"
 
 #define MMWR \
 "   movw $r15 0xe800\n" \
@@ -299,6 +305,7 @@ static unsigned unk3ec[3];
 "   iord $r11 I[$r15]\n"
 
 static char pre[] =
+#if !DEBUG_C
 "section #data\n"
 "section #code\n"
 "init:\n"
@@ -309,6 +316,10 @@ static char pre[] =
 "   movw $r0 -1\n"
 "   st b32 D[$r3] $r0\n"
 "   add b32 $r3 $r3 4\n"
+"   xcwait\n"
+"   mov $r10 0\n"
+"   sethi $r10 0x8000000\n"
+"   call #sleep\n"
 "   bra #main\n"
 "\n"
 
@@ -321,7 +332,6 @@ MMSYNC("")
 #define MMSYNC(x) "   call #mmsync\n"
 #endif
 
-// Cannot use registers 10..13 in mmsync because of them being function arguments
 // The pushes are mostly for debugging, putting the most recent mmrd/wr on the stack
 "mmwrs:\n" // mmwrs(register, value)
 "   push $r10\n"
@@ -357,11 +367,6 @@ MMSYNC("rdo")
 "   ret\n"
 "\n"
 "wait_mask:\n" // mmrd(register, mask, expected, timeout)
-"   push $r8\n"
-"   push $r7\n"
-"   push $r6\n"
-"   push $r5\n"
-"   push $r4\n"
 "   mov b32 $r6 $r10\n" // register
 "   mov b32 $r7 $r11\n" // mask
 "   mov b32 $r8 $r12\n" // expected
@@ -382,11 +387,6 @@ MMSYNC("rdo")
 "      bra l #repeat\n"
 "   mov $r10 0x999\n" // nein nein nein (failed)
 "   success:\n"
-"   pop $r4\n"
-"   pop $r5\n"
-"   pop $r6\n"
-"   pop $r7\n"
-"   pop $r8\n"
 "   ret\n"
 "\n"
 "sleep:\n"
@@ -394,25 +394,22 @@ MMSYNC("rdo")
 "   iord $r15 I[$r11]\n"
 "   add b32 $r15 $r10\n"
 "   sleeploop:\n"
-"      push $r12\n"
-"      pop $r12\n"
 "      iord $r10 I[$r11]\n"
 "      sub b32 $r12 $r10 $r15\n"
 "      bra l #sleeploop\n"
 "   ret\n"
 "\n"
 "enter_lock:\n"
-"   push $r0\n"
 "   mov $r10 0x1620\n"
 "   call #mmrd\n"
-"   mov b32 $r0 $r10\n"
+"   mov b32 $r4 $r10\n"
 "   movw $r11 -0xaa3\n"
 "   mov $r10 0x1620\n"
-"   and $r0 $r0 $r11\n"
-"   mov b32 $r11 $r0\n"
+"   and $r4 $r4 $r11\n"
+"   mov b32 $r11 $r4\n"
 "   call #mmwrs\n"
-"   bclr $r0 0\n"
-"   mov b32 $r11 $r0\n"
+"   bclr $r4 0\n"
+"   mov b32 $r11 $r4\n"
 "   mov $r10 0x1620\n"
 "   call #mmwrs\n"
 "\n"
@@ -433,11 +430,9 @@ MMSYNC("rdo")
 "      iord $r11 I[$r10]\n"
 "      and $r11 4\n"
 "      bra z #enterloop\n"
-"   pop $r0\n"
 "   ret\n"
 "\n"
 "leave_lock:\n"
-"   push $r0\n"
 "   movw $r10 0xf900\n"
 "   sethi $r10 0x10000\n"
 "   mov $r11 4\n"
@@ -458,18 +453,18 @@ MMSYNC("rdo")
 "\n"
 "   mov $r10 0x1620\n"
 "   call #mmrd\n"
-"   mov b32 $r0 $r10\n"
-"   bset $r0 0\n"
-"   mov b32 $r11 $r0\n"
+"   mov b32 $r4 $r10\n"
+"   bset $r4 0\n"
+"   mov b32 $r11 $r4\n"
 "   mov $r10 0x1620\n"
 "   call #mmwrs\n"
 "   mov $r12 0xaa2\n"
 "   mov $r10 0x1620\n"
-"   or $r11 $r0 $r12\n"
+"   or $r11 $r4 $r12\n"
 "   call #mmwrs\n"
-"   pop $r0\n"
 "   ret\n"
 "\n"
+#endif
 "main:\n";
 
 static char post[] =
@@ -481,11 +476,12 @@ static char post[] =
 
 static void record_op(unsigned op, unsigned len) {
 #if !DEBUG_C
-	printf("   mov $r12 0x%x\n", op);
+	printf("   movw $r12 %#x\n", op);
+	printf("   sethi $r12 %#x\n", (len + 0xf000) << 0x10);
 	printf("   st b32 D[$r3] $r12\n");
 	printf("   add b32 $r3 $r3 4\n");
 #else
-	printf("op %x with len %u\n", op, len);
+	printf("%x\n", ((0xf000 + len) << 16) | op);
 #endif
 }
 

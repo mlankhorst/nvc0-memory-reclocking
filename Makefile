@@ -17,7 +17,7 @@ out.asm: values
 clean:
 	rm -f gen in.asm values out.asm core
 
-dead: values
+dead: values out.asm
 	sync
 	./reclock < values
 	sync
