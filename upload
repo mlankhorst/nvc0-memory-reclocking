@@ -20,8 +20,8 @@ while read line; do
 	nvapoke 0x10a184 $line
 done
 
-while [ $(($n % 64)) -ne 63 ]; do
-	nvapoke 0x10a184 0
+while [ $(($n % 64)) -ne 0 ]; do
+	nvapoke 0x10a188 0
 	n=$((${n}+1))
 done
 

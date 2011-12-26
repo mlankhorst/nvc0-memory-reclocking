@@ -2,7 +2,7 @@
 #include <unistd.h>
 #include <assert.h>
 
-#define DISABLE_LOCK 0
+#define DISABLE_LOCK 1
 #define DEBUG_C 0
 
 // Calling convention
@@ -313,17 +313,13 @@ static char pre[] =
 "   bclr $flags ie1\n"
 "   mov $r3 0x5600\n"
 "   mov $sp $r3\n"
-"   movw $r0 -1\n"
+"   movw $r0 0\n"
 "   st b32 D[$r3] $r0\n"
 "   add b32 $r3 $r3 4\n"
-"   xcwait\n"
-"   mov $r10 0\n"
-"   sethi $r10 0x8000000\n"
-"   call #sleep\n"
 "   bra #main\n"
 "\n"
 
-#if 0
+#if 1
 "mmsync:\n"
 MMSYNC("")
 "   ret\n\n"
@@ -471,15 +467,20 @@ static char post[] =
 "   st b32 D[$r3] $r0\n"
 "   add b32 $r3 $r3 4\n"
 "   st b32 D[$r3] $r3\n"
+"   add b32 $r3 $r3 4\n"
+"   movw $r0 0xdead\n"
+"   sethi $r0 0xdead0000\n"
+"   push $r0\n"
+"   st b32 D[$r3] $r0\n"
 "   dead:\n"
 "      bra #dead\n";
 
 static void record_op(unsigned op, unsigned len) {
 #if !DEBUG_C
-	printf("   movw $r12 %#x\n", op);
-	printf("   sethi $r12 %#x\n", (len + 0xf000) << 0x10);
-	printf("   st b32 D[$r3] $r12\n");
-	printf("   add b32 $r3 $r3 4\n");
+//	printf("   movw $r12 %#x\n", op);
+//	printf("   sethi $r12 %#x\n", (len + 0xf000) << 0x10);
+//	printf("   st b32 D[$r3] $r12\n");
+//	printf("   add b32 $r3 $r3 4\n");
 #else
 	printf("%x\n", ((0xf000 + len) << 16) | op);
 #endif
@@ -505,9 +506,9 @@ static void out(char *reg, unsigned val) {
 #if !DEBUG_C
 	printf("   movw $%s 0x%x\n", reg, val & 0xffff);
 	if (val >= 0x8000)
-		printf("   sethi $%s %#x\n", reg, val & ~0xffff);
-	printf("   st b32 D[$r3] $%s\n", reg);
-	printf("   add b32 $r3 $r3 4\n");
+		printf("   sethi $%s %#x\n", reg, val & 0xffff0000);
+//	printf("   st b32 D[$r3] $%s\n", reg);
+//	printf("   add b32 $r3 $r3 4\n");
 #else
 	printf("%s%#x", strcmp(reg, "r10") ? ", " : "", val);
 #endif
@@ -593,8 +594,19 @@ int main(int argc, char **argv) {
 
 			case 0x21:
 				for (i = 1; i < len; i += 2) {
+					record_op(d[i], d[i] >> 0x10);
 					//printf("%s(0x%x, 0x%x)\n", len > 3 ? "mmwrs_group" : method, d[i], d[i+1]);
-					fn2(len > 3 ? "mmwr" : method, d[i], d[i+1]);
+#if !DEBUG_C && 0
+					if (len > 3) {
+						static int iter;
+						out("r10", d[i]);
+						out("r11", d[i+1]);
+						printf("%s", MMWR);
+						printf(MMSYNC("%04x"), iter, iter);
+						++iter;
+					} else
+#endif
+						fn2(len > 3 ? "mmwr" : method, d[i], d[i+1]);
 				}
 				unk3ec[0] = d[i-1];
 				unk3ec[1] = d[i-2];

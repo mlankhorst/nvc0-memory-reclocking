@@ -8,3 +8,5 @@ for n in `seq 0 $((0x${len}/4-1))`; do
 printf "%x: %s\n" $((0x${addr} + $n * 4)) $(nvapeek 0x10a1c4 | sed -e s@.*\ @@)
 done
 
+nvapeek 10a000 1000
+
