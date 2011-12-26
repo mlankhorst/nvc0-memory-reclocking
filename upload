@@ -16,16 +16,16 @@ while read line; do
 		nvapoke 0x10a188 $(printf %x $(($n >> 6)))
 	fi
 
-	n=$((${n}+1));
-	nvapoke 0x10a184 $line;
+	n=$((${n}+1))
+	nvapoke 0x10a184 $line
 done
 
-while [ $(($n % 64)) -ne 0 ]; do
+while [ $(($n % 64)) -ne 63 ]; do
 	nvapoke 0x10a184 0
 	n=$((${n}+1))
 done
 
-nvapoke 0x10a1c0 0x01005500
+nvapoke 0x10a1c0 0x01005580
 for i in `seq 0 255`; do nvapoke 0x10a1c4 0; done
 
 nvapoke 0x10a10c 0
