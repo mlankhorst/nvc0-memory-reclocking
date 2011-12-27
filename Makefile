@@ -1,23 +1,16 @@
 #
 
-all: out.asm
+all: gen
 
-gen: gen.c
-	$(CC) gen.c -o gen
+ET=../envytools
 
-in.asm: gen
-	./gen > in.asm
+gen.h:
+	envyas -a -w -m fuc -V nva3 in.fuc -o gen.h
 
-values: in.asm
-	envyas -w -m fuc -V nva3 in.asm > values
+gen: gen.c gen.h
+	$(CC) gen.c -o gen -I $(ET)/include -lpciaccess -L $(ET)/nva -lnva -Wall -g -O
 
-out.asm: values
-	fucdis -n -w -V nva3 values > out.asm
-
-clean:
-	rm -f gen in.asm values out.asm core
-
-dead: values out.asm
+dead: gen
 	sync
 	./reclock < values
 	sync

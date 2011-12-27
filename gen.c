@@ -1,9 +1,22 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <assert.h>
+#include "nva.h"
+#include "gen.h"
+
+enum fuc_ops {
+   fuc_ops_none = -1,
+   fuc_ops_done,
+   fuc_ops_mmwrs,
+   fuc_ops_mmwr,
+   fuc_ops_mmrd,
+   fuc_ops_wait_mask,
+   fuc_ops_sleep,
+   fuc_ops_enter_lock,
+   fuc_ops_leave_lock
+};
 
 #define DISABLE_LOCK 1
-#define DEBUG_C 0
 
 // Calling convention
 // r9..r15 always trash
@@ -275,287 +288,61 @@ static unsigned data[] = {
 0
 };
 
-static char *method = "mmwrs";
+static enum fuc_ops method;
 
-static unsigned unk3ec[3];
+static unsigned out[0x800];
+static unsigned outpos;
 
-// Cannot use registers 10..13 in mmsync because of them being function arguments
-#define MMSYNC(x) \
-"   mov $r9 0\n" \
-"   mmloop_" x ":\n" \
-"      push $r9\n" \
-"      pop $r9\n" \
-"      movw $r15 0xeb00\n" \
-"      sethi $r15 0x10000\n" \
-"      iord $r15 I[$r15]\n" \
-"      add b32 $r9 $r9 1\n" \
-"      extr $r15 $r15 12:14\n" \
-"      bra nz #mmloop_" x "\n"
-
-#define MMWR \
-"   movw $r15 0xe800\n" \
-"   sethi $r15 0x10000\n" \
-"   iowr I[$r15] $r10\n" \
-"   add b32 $r15 0x100\n" \
-"   iowr I[$r15] $r11\n" \
-"   add b32 $r15 0x200\n" \
-"   mov $r11 0xf2\n" \
-"   sethi $r11 0x10000\n" \
-"   iowr I[$r15] $r11\n" \
-"   iord $r11 I[$r15]\n"
-
-static char pre[] =
-#if !DEBUG_C
-"section #data\n"
-"section #code\n"
-"init:\n"
-"   bclr $flags ie0\n"
-"   bclr $flags ie1\n"
-"   mov $r3 0x5600\n"
-"   mov $sp $r3\n"
-"   movw $r0 0\n"
-"   st b32 D[$r3] $r0\n"
-"   add b32 $r3 $r3 4\n"
-"   bra #main\n"
-"\n"
-
-#if 1
-"mmsync:\n"
-MMSYNC("")
-"   ret\n\n"
-
-#undef MMSYNC
-#define MMSYNC(x) "   call #mmsync\n"
-#endif
-
-// The pushes are mostly for debugging, putting the most recent mmrd/wr on the stack
-"mmwrs:\n" // mmwrs(register, value)
-"   push $r10\n"
-MMSYNC("wrsi")
-MMWR
-MMSYNC("wrso")
-"   pop $r10\n"
-"   ret\n"
-"\n"
-"mmwr:\n" // mmwr(register, value)
-"   push $r10\n"
-MMSYNC("wri")
-MMWR
-"   pop $r10\n"
-"   ret\n"
-"\n"
-"mmrd:\n" // mmrd(register)
-"   push $r10\n"
-MMSYNC("rdi")
-"   movw $r15 0xe800\n"
-"   sethi $r15 0x10000\n"
-"   iowr I[$r15] $r10\n"
-"   add b32 $r15 0x300\n"
-"   mov $r11 0xf1\n"
-"   sethi $r11 0x10000\n"
-"   iowr I[$r15] $r11\n"
-"   iord $r11 I[$r15]\n"
-MMSYNC("rdo")
-"   movw $r15 0xe900\n"
-"   sethi $r15 0x10000\n"
-"   pop $r10\n"
-"   iord $r10 I[$r15]\n"
-"   ret\n"
-"\n"
-"wait_mask:\n" // mmrd(register, mask, expected, timeout)
-"   mov b32 $r6 $r10\n" // register
-"   mov b32 $r7 $r11\n" // mask
-"   mov b32 $r8 $r12\n" // expected
-"   mov b32 $r5 $r13\n" // timeout
-"   movw $r9 0xb00\n"
-"   iord $r4 I[$r9]\n" // start time
-"   repeat:\n"
-"      mov b32 $r10 $r6\n"
-"      call #mmrd\n"
-"      and $r12 $r10 $r7\n"
-"      mov $r10 0x1111\n" // return 0x1111 if succesful
-"      cmp b32 $r12 $r8\n" // value & mask == expected
-"      bra e #success\n"
-"      movw $r9 0xb00\n"
-"      iord $r10 I[$r9]\n" // start time
-"      sub b32 $r10 $r10 $r4\n" // now - start < timeout? repeat
-"      cmp b32 $r10 $r5\n"
-"      bra l #repeat\n"
-"   mov $r10 0x999\n" // nein nein nein (failed)
-"   success:\n"
-"   ret\n"
-"\n"
-"sleep:\n"
-"   movw $r11 0xb00\n"
-"   iord $r15 I[$r11]\n"
-"   add b32 $r15 $r10\n"
-"   sleeploop:\n"
-"      iord $r10 I[$r11]\n"
-"      sub b32 $r12 $r10 $r15\n"
-"      bra l #sleeploop\n"
-"   ret\n"
-"\n"
-"enter_lock:\n"
-"   mov $r10 0x1620\n"
-"   call #mmrd\n"
-"   mov b32 $r4 $r10\n"
-"   movw $r11 -0xaa3\n"
-"   mov $r10 0x1620\n"
-"   and $r4 $r4 $r11\n"
-"   mov b32 $r11 $r4\n"
-"   call #mmwrs\n"
-"   bclr $r4 0\n"
-"   mov b32 $r11 $r4\n"
-"   mov $r10 0x1620\n"
-"   call #mmwrs\n"
-"\n"
-"   mov $r10 0x26f0\n"
-"   call #mmrd\n"
-"   mov b32 $r11 $r10\n"
-"   bclr $r11 0\n"
-"   mov $r10 0x26f0\n"
-"   call #mmwrs\n"
-"   movw $r10 0xf800\n"
-"   sethi $r10 0x10000\n"
-"\n"
-"   mov $r11 4\n"
-"   iowr I[$r10] $r11\n"
-"   iord $r11 I[$r10]\n"
-"   sub b32 $r10 $r10 0x700\n"
-"   enterloop:\n"
-"      iord $r11 I[$r10]\n"
-"      and $r11 4\n"
-"      bra z #enterloop\n"
-"   ret\n"
-"\n"
-"leave_lock:\n"
-"   movw $r10 0xf900\n"
-"   sethi $r10 0x10000\n"
-"   mov $r11 4\n"
-"   iowr I[$r10] $r11\n"
-"   iord $r11 I[$r10]\n"
-"   sub b32 $r10 $r10 0x800\n"
-"   leaveloop:\n"
-"      iord $r11 I[$r10]\n"
-"      and $r11 4\n"
-"      bra nz #leaveloop\n"
-"\n"
-"   mov $r10 0x26f0\n"
-"   call #mmrd\n"
-"   mov b32 $r10 $r11\n"
-"   bset $r11 0\n"
-"   mov $r10 0x26f0\n"
-"   call #mmwrs\n"
-"\n"
-"   mov $r10 0x1620\n"
-"   call #mmrd\n"
-"   mov b32 $r4 $r10\n"
-"   bset $r4 0\n"
-"   mov b32 $r11 $r4\n"
-"   mov $r10 0x1620\n"
-"   call #mmwrs\n"
-"   mov $r12 0xaa2\n"
-"   mov $r10 0x1620\n"
-"   or $r11 $r4 $r12\n"
-"   call #mmwrs\n"
-"   ret\n"
-"\n"
-#endif
-"main:\n";
-
-static char post[] =
-"   st b32 D[$r3] $r0\n"
-"   add b32 $r3 $r3 4\n"
-"   st b32 D[$r3] $r3\n"
-"   add b32 $r3 $r3 4\n"
-"   movw $r0 0xdead\n"
-"   sethi $r0 0xdead0000\n"
-"   push $r0\n"
-"   st b32 D[$r3] $r0\n"
-"   dead:\n"
-"      bra #dead\n";
-
-static void record_op(unsigned op, unsigned len) {
-#if !DEBUG_C
-//	printf("   movw $r12 %#x\n", op);
-//	printf("   sethi $r12 %#x\n", (len + 0xf000) << 0x10);
-//	printf("   st b32 D[$r3] $r12\n");
-//	printf("   add b32 $r3 $r3 4\n");
-#else
-	printf("%x\n", ((0xf000 + len) << 16) | op);
-#endif
+static void emit(enum fuc_ops func, unsigned len_args, unsigned args[], unsigned saveret)
+{
+	unsigned j;
+	out[outpos++] = (4 + 4 * len_args) | (saveret << 31);
+	out[outpos++] = nvc0_pdaemon_data[func];
+	for (j = 0; j < len_args; ++j)
+		out[outpos++] = args[j];
 }
 
-static void prefn(const char *fn) {
-#if !DEBUG_C
-#else
-	printf("\n%s(", fn);
-#endif
-}
+unsigned unk3ec[2];
 
-static void postfn(const char *fn) {
-#if !DEBUG_C
-	printf("   call #%s\n", fn);
-#else
-	printf(");\n", fn);
-#endif
-}
-
-
-static void out(char *reg, unsigned val) {
-#if !DEBUG_C
-	printf("   movw $%s 0x%x\n", reg, val & 0xffff);
-	if (val >= 0x8000)
-		printf("   sethi $%s %#x\n", reg, val & 0xffff0000);
-//	printf("   st b32 D[$r3] $%s\n", reg);
-//	printf("   add b32 $r3 $r3 4\n");
-#else
-	printf("%s%#x", strcmp(reg, "r10") ? ", " : "", val);
-#endif
-}
-
-static void saveret(void) {
-#if !DEBUG_C
-	printf("   st b32 D[$r3] $r10\n");
-	printf("   add b32 $r3 $r3 4\n");
-#endif
-}
-
-static void fn0(const char *fn) {
-	prefn(fn);
-	postfn(fn);
-}
-
-static void fn1(const char *fn, unsigned x) {
-	prefn(fn);
-	out("r10", x);
-	postfn(fn);
-}
-
-static void fn2(const char *fn, unsigned x, unsigned y) {
-	prefn(fn);
-	out("r10", x);
-	out("r11", y);
-	postfn(fn);
-}
-
-static void fn4(const char *fn, unsigned x, unsigned y, unsigned z, unsigned w) {
-	prefn(fn);
-	out("r10", x);
-	out("r11", y);
-	out("r12", z);
-	out("r13", w);
-	postfn(fn);
+static void upload(unsigned cnum) {
+	unsigned val = nva_rd32(cnum, 0x200);
+	int i;
+	val &= ~(1<<13);
+	nva_wr32(cnum, 0x200, val);
+	nva_wr32(cnum, 0x200, val | (1<<13));
+	nva_wr32(cnum, 0x10a180, 0x01000000);
+	nva_wr32(cnum, 0x10a47c, 0x7013452f);
+	for (i = 0; i < sizeof(nvc0_pdaemon_code)/sizeof(*nvc0_pdaemon_code); ++i) {
+		if (i % 64 == 0)
+			nva_wr32(cnum, 0x10a188, i >> 6);
+		nva_wr32(cnum, 0x10a184, nvc0_pdaemon_code[i]);
+	}
+	nva_wr32(cnum,0x10a1c0, 0x01000800);
+	for (i = 0; i < outpos; ++i)
+		nva_wr32(cnum, 0x10a1c4, out[i]);
+	nva_wr32(cnum,0x10a1c0, 0x010055c0);
+	for (i = 0; i < 0x440; ++i)
+		nva_wr32(cnum, 0x10a1c4, 0);
+	nva_wr32(cnum, 0x10a104, 0);
+	nva_wr32(cnum, 0x10a100, 2);
 }
 
 int main(int argc, char **argv) {
+	unsigned cnum = 0;
+	if (nva_init()) {
+		fprintf (stderr, "PCI init failure!\n");
+		return 1;
+	}
+	if (cnum >= nva_cardsnum) {
+		fprintf (stderr, "No cards found.\n");
+		return 1;
+	}
 	unsigned *d = data, *end = data + (sizeof(data)/sizeof(*data));
 	unsigned i;
-	printf("/* envyas -a -w -m fuc -V nva3 -o braaksel */\n");
-	printf("%s\n", pre);
 	while (d < end) {
 		unsigned op = *d & 0xffff, len = *d >> 0x10;
-		record_op(op, len);
+		enum fuc_ops fuc_op;
+		unsigned args[4];
 
 		switch (op) {
 			case 0:
@@ -564,49 +351,44 @@ int main(int argc, char **argv) {
 				break;
 
 			case 0x2e:
-				fn1("mmrd", 0);
-				saveret();
+				args[0] = 0;
+				emit(fuc_ops_mmrd, 1, args, 1);
 			case 0x13: // Fallthrough
-				fn1("sleep", d[1]);
+				args[0] = d[1];
+				emit(fuc_ops_sleep, 1, args, 0);
 				break;
 
 			case 0x15:
-				unk3ec[2] *= 2;
-				fn4("wait_mask", unk3ec[1], d[1], unk3ec[0], d[2]);
-				saveret();
-				// unk3ec[2] |= success;
+				args[0] = unk3ec[1];
+				args[1] = d[1];
+				args[2] = unk3ec[0];
+				args[3] = d[2];
+				emit(fuc_ops_wait_mask, 4, args, 1);
 				break;
 
 			case 0x16:
-				printf("%s\n", post);
-				return 0;
+				args[0] = d[1];
+				emit(fuc_ops_done, 1, args, 0);
+				break;
 
 			case 0x20:
 				assert(!d[2]);
 #if !DISABLE_LOCK
 				if (d[1])
-					fn0("enter_lock");
+					fuc_op = fuc_ops_enter_lock;
 				else
-					fn0("leave_lock");
+					fuc_op = fuc_ops_leave_lock;
+				emit(fuc_op, 0, args, 0);
 #endif
-				method = d[1] ? "mmwr" : "mmwrs";
+				method = d[1] ? fuc_ops_mmwr : fuc_ops_mmwrs;
 				break;
 
 			case 0x21:
+				fuc_op = len > 3 ? fuc_ops_mmwr : method;
 				for (i = 1; i < len; i += 2) {
-					record_op(d[i], d[i] >> 0x10);
-					//printf("%s(0x%x, 0x%x)\n", len > 3 ? "mmwrs_group" : method, d[i], d[i+1]);
-#if !DEBUG_C && 0
-					if (len > 3) {
-						static int iter;
-						out("r10", d[i]);
-						out("r11", d[i+1]);
-						printf("%s", MMWR);
-						printf(MMSYNC("%04x"), iter, iter);
-						++iter;
-					} else
-#endif
-						fn2(len > 3 ? "mmwr" : method, d[i], d[i+1]);
+					args[0] = d[i];
+					args[1] = d[i+1];
+					emit(fuc_op, 2, args, 0);
 				}
 				unk3ec[0] = d[i-1];
 				unk3ec[1] = d[i-2];
@@ -622,7 +404,9 @@ int main(int argc, char **argv) {
 		}
 		d += len;
 	}
-	assert(0);
-	return 1;
+	assert(out[outpos - 2] == nvc0_pdaemon_data[fuc_ops_done]);
+
+	upload(cnum);
+	return 0;
 }
 
