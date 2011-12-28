@@ -4,7 +4,8 @@ b32 #done
 b32 #mmwrs
 b32 #mmwr
 b32 #mmrd
-b32 #wait_mask
+b32 #wait_mask_ext
+b32 #wait_mask_iord
 b32 #sleep
 b32 #enter_lock
 b32 #leave_lock
@@ -98,27 +99,45 @@ mmrd:
    iord $r10 I[$r15]
    ret
 
-wait_mask:
+wait_mask_ext:
    mov b32 $r6 $r10
    mov b32 $r7 $r11
    mov b32 $r8 $r12
    mov b32 $r5 $r13
    mov $r9 0xb00
    iord $r4 I[$r9]
-   repeat:
+   repeat_ext:
       mov b32 $r10 $r6
       call #mmrd
       and $r12 $r10 $r7
       mov $r10 0x1111
       cmp b32 $r12 $r8
-      bra e #success
+      bra e #success_ext
       mov $r9 0xb00
       iord $r10 I[$r9]
       sub b32 $r10 $r10 $r4
       cmp b32 $r10 $r5
-      bra l #repeat
+      bra l #repeat_ext
    mov $r10 0x999
-   success:
+   success_ext:
+   ret
+
+wait_mask_iord:
+   movw $r9 0xb00
+   iord $r14 I[$r9]
+   repeat_iord:
+      iord $r15 I[$r10]
+      and $r15 $r15 $r11
+      cmp b32 $r15 $r12
+      bra e #success_iord
+      iord $r15 I[$r9]
+      sub b32 $r15 $r15 $r14
+      cmp b32 $r15 $r13
+      bra l #repeat_iord
+   mov $r10 0x4999
+   ret
+   success_iord:
+   mov $r10 0x4111
    ret
 
 sleep:

@@ -1,0 +1,30 @@
+#!/bin/bash
+
+e="" # Set to echo for dry run
+
+$e nvapoke 0x001548 0x80000101
+
+$e nvapeek 0x10f468 #was 20020
+$e nvapoke 0x10f468 0x00001005
+
+$e nvapeek 0x10f420 # was   43
+$e nvapoke 0x10f420 0x00000042
+
+$e nvapeek 0x10f430 #was    41
+$e nvapoke 0x10f430 0x00000040
+
+$e nvapeek 0x10f400 #was  171f
+$e nvapoke 0x10f400 0x00001707
+
+$e nvapeek 0x10f410 #was   107
+$e nvapoke 0x10f410 0x00000307
+
+$e nvapeek 0x10f444 #  4cc883f
+$e nvapoke 0x10f444 0x04cc009f
+
+$e nvapoke 0x001548 0x80000102
+
+$e ./down
+
+$e nvapoke 0x001548 0x101
+
