@@ -16,7 +16,7 @@ enum fuc_ops {
    fuc_ops_leave_lock
 };
 
-#define DISABLE_LOCK 1
+#define DISABLE_LOCK 0
 
 // Calling convention
 // r9..r15 always trash
@@ -288,18 +288,19 @@ static unsigned data[] = {
 0
 };
 
-static enum fuc_ops method;
+static enum fuc_ops method = fuc_ops_mmwrs;
 
 static unsigned out[0x800];
 static unsigned outpos;
 
 static void emit(enum fuc_ops func, unsigned len_args, unsigned args[], unsigned saveret)
 {
-	unsigned j;
-	out[outpos++] = (4 + 4 * len_args) | (saveret << 31);
+	unsigned j, oldpos = outpos;
+	out[outpos++] = (8 + 4 * len_args) | (saveret << 31);
 	out[outpos++] = nvc0_pdaemon_data[func];
 	for (j = 0; j < len_args; ++j)
 		out[outpos++] = args[j];
+	assert(outpos == (oldpos + 2 + len_args));
 }
 
 unsigned unk3ec[2];
@@ -310,20 +311,23 @@ static void upload(unsigned cnum) {
 	val &= ~(1<<13);
 	nva_wr32(cnum, 0x200, val);
 	nva_wr32(cnum, 0x200, val | (1<<13));
-	nva_wr32(cnum, 0x10a180, 0x01000000);
 	nva_wr32(cnum, 0x10a47c, 0x7013452f);
+	nva_wr32(cnum, 0x10a180, 0x01000000);
 	for (i = 0; i < sizeof(nvc0_pdaemon_code)/sizeof(*nvc0_pdaemon_code); ++i) {
 		if (i % 64 == 0)
 			nva_wr32(cnum, 0x10a188, i >> 6);
 		nva_wr32(cnum, 0x10a184, nvc0_pdaemon_code[i]);
 	}
+
 	nva_wr32(cnum,0x10a1c0, 0x01000800);
 	for (i = 0; i < outpos; ++i)
 		nva_wr32(cnum, 0x10a1c4, out[i]);
+
 	nva_wr32(cnum,0x10a1c0, 0x010055c0);
-	for (i = 0; i < 0x440; ++i)
+	for (i = 0; i < 0x440; i += 4)
 		nva_wr32(cnum, 0x10a1c4, 0);
 	nva_wr32(cnum, 0x10a104, 0);
+	nva_wr32(cnum, 0x10a10c, 0);
 	nva_wr32(cnum, 0x10a100, 2);
 }
 

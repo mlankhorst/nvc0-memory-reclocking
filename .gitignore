@@ -1,7 +1,6 @@
 gen
-in.asm
-out.asm
-values
+out.fuc
+gen.h
 *~
 *.rej
 *.orig
