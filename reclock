@@ -140,3 +140,28 @@ $e ./gen
 
 $e nvapoke 0x001548 0x102
 
+$e nvapeek 0x10f824 #     7fd4
+$e nvapoke 0x10f824 0x00007fd4
+
+$e nvapoke 0x001548 0x102
+
+$e nvapeek 0x10f468 #     1005
+$e nvapoke 0x10f468 0x00020020 
+
+$e nvapeek 0x10f420 #       42
+$e nvapoke 0x10f420 0x00000043
+
+$e nvapeek 0x10f430 #       40
+$e nvapoke 0x10f430 0x00000041
+
+$e nvapeek 0x10f400 #     1707
+$e nvapoke 0x10f400 0x0000171f
+
+$e nvapeek 0x10f410 #      307
+$e nvapoke 0x10f410 0x00000107
+
+$e nvapeek 0x10f444 # 04cc009f
+$e nvapoke 0x10f444 0x04cc883f
+
+$e nvapoke 0x001548 0x101
+
