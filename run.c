@@ -103,13 +103,15 @@ int main(int argc, char **argv) {
 				break;
 
 			case 0x14: {
-				unsigned tab[] = { 1, 4, 8, 0x20, 0x10, 0x40 };
+				unsigned tab[] = { 4, 8, 0x20, 0x10, 0x40 };
+				unsigned x = ((d[1]/2) & 0x7f) - 1;
 				args[0] = 0x7c4 * 0x40;
-				if (d[1] / 2 < sizeof(tab)/sizeof(*tab))
-					args[1] = tab[d[1] / 2];
+				if (x < sizeof(tab)/sizeof(*tab))
+					args[1] = tab[x];
 				else {
 					args[1] = tab[0];
-					assert(0);
+					fprintf(stderr, "Ignored data: %x\n", d[1]);
+					break;
 				}
 				args[2] = (d[1] & 1) ? args[1] : 0;
 				args[3] = d[2];
