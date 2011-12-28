@@ -232,8 +232,6 @@ main:
    st b32 D[$r3+8] $r10
    add b32 $r3 0xc
 
-   push $r15
-   push $r1
    call $r15
 
    cmp b32 $r0 $r1

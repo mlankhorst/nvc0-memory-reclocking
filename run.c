@@ -2,7 +2,7 @@
 #include <unistd.h>
 #include <assert.h>
 #include "nva.h"
-#include "gen.h"
+#include "in.fuc.h"
 
 enum fuc_ops {
    fuc_ops_none = -1,
@@ -147,6 +147,7 @@ int main(int argc, char **argv) {
 				for (i = 1; i < len; i += 2) {
 					args[0] = d[i];
 					args[1] = d[i+1];
+					assert(method == fuc_ops_mmwr || method == fuc_ops_mmwrs);
 					emit(fuc_op, 2, args, 0);
 				}
 				unk3ec[0] = d[i-1];
