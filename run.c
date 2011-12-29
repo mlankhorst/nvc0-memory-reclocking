@@ -51,7 +51,6 @@ static void upload(unsigned cnum) {
 	val &= ~(1<<13);
 	nva_wr32(cnum, 0x200, val);
 	nva_wr32(cnum, 0x200, val | (1<<13));
-	nva_wr32(cnum, 0x10a47c, 0x7013452f);
 	nva_wr32(cnum, 0x10a180, 0x01000000);
 	for (i = 0; i < sizeof(nvc0_pdaemon_code)/sizeof(*nvc0_pdaemon_code); ++i) {
 		if (i % 64 == 0)
