@@ -3,29 +3,10 @@
 e="" # Set to echo for dry run
 
 # PCLOCK?
-$e nvapoke 0x1371c8 0x00030000
-$e nvapoke 0x1371cc 0x00030000
+#$e nvapoke 0x1371c8 0x00030000
+#$e nvapoke 0x1371cc 0x00030000
 $e nvapeek 0x137360 # was 3, but should already be 1, why?
 $e nvapoke 0x137360 1
-
-# PIBUS?
-$e nvapoke 0x122310 0x00000800
-$e nvapoke 0x12232c 0x00100064
-$e nvapoke 0x122330 0x00100064
-$e nvapoke 0x122334 0x00100064
-$e nvapoke 0x122348 0x00000100
-
-# PMFB (once)
-$e nvapoke 0x17e820 0x036f0000 # was 37f
-$e nvapoke 0x17e900 0x00056c00 # was 76800
-$e nvapoke 0x17e934 0x1c008440 # was 0x1d00883a
-$e nvapoke 0x17ea00 8
-$e nvapoke 0x17e8c0 0x3f000ff3 # was .*fe3
-$e nvapoke 0x17e858 0xfc407430
-
-# PFFB
-$e nvapoke 0x100b44 0x00010001
-$e nvapoke 0x100d74 0x0ff0101d # was 0x0ff01023
 
 # PBFB_BROADCAST
 $e nvapoke 0x10f440 0x22f84f10 # was 0x22442410
